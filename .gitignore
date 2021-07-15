@@ -1,2 +1,5 @@
-# ignore checkpoint notebooks
-.ipynb_checkpoints
+# # ignore checkpoint notebooks
+# .ipynb_checkpoints
+
+# # ignore python generated directories
+# __pycache__
