@@ -69,7 +69,12 @@ def remove_duplicate_tracks(tracks_per_bin):
         tracks_per_bin[_bin] = list(set(tracks_in_it))
 
 
-def pipeline(df, bin_size, limits, num_tracks_to_estimate):
+def bins_with_least_hits(tracks_per_bin, min_hits):
+    """ Returns a list of bins (tuple of ints) that have a minimum value. """
+    return list(filter(lambda key: len(tracks_per_bin[key]) >= min_hits, tracks_per_bin))
+
+
+def pipeline(df, bin_size, limits, selection_hyperparameters):
     """
     :param pd.DataFrame df:
         The dataframe with the hits information.
@@ -80,25 +85,17 @@ def pipeline(df, bin_size, limits, num_tracks_to_estimate):
     :param tuple[tuple[float, float], tuple[float, float]] limits:
         The range of selection for the values of the parameters (m, b).
 
-    :param int num_tracks_to_estimate:
-        Number of tracks to sample from the accumulator.
-        Later will remove this, as selection will occur with other methods.
+    :param dict[str, int] selection_hyperparameters:
+        A dictionary that provides us with the hyperprameters of the selection function (currently only minimum-hits-per-bin).
     """
     # get all the possible tracks in the Hough space and which row of the dataframe they correspond to
-    all_tracks, hit_to_truth_df_row = get_tracks(df)
+    all_tracks, _ = get_tracks(df)
 
     # range of search for slope (m) and intercept (b) values: bin size
-    left_m_limit, right_m_limit = limits[0]
-    left_b_limit, right_b_limit = limits[1]
-    m_range = np.arange(left_m_limit, right_m_limit, bin_size[0])
-    b_range = np.arange(left_b_limit, right_b_limit, bin_size[1])
-
-    # accumulator array that will store the scores (votes) of the tracks
-    accumulator = np.zeros((m_range.shape[0], b_range.shape[0]))
+    m_limits, b_limits = limits
 
     # dictionary that stores which tracks go through each bin
     tracks_per_bin = {}
-
     # loop for all the tracks in the Hough space
     for idx, track_1 in enumerate(all_tracks):
 
@@ -109,28 +106,26 @@ def pipeline(df, bin_size, limits, num_tracks_to_estimate):
             intersection_x, intersection_y = find_intersections(track_1, track_2)
 
             # if the intersection point is outside of the boundary, ignore it
-            if (not left_m_limit <= intersection_x <= right_m_limit) or not (left_b_limit <= intersection_y <= right_b_limit):
+            if (not m_limits[0] <= intersection_x <= m_limits[1]) or not (b_limits[0] <= intersection_y <= b_limits[1]):
                 continue
 
             # get the bin it belongs to
-            bin_x, bin_y = find_bin(intersection_x, intersection_y, left_m_limit, left_b_limit, bin_size)
+            bin_x, bin_y = find_bin(intersection_x, intersection_y, m_limits[0], b_limits[0], bin_size)
 
-            # increment the accumulator for that bin and add the tracks to the bin
-            accumulator[bin_x, bin_y] += 1
+            # add the tracks to the bin
             update_tracks_per_bin(tracks_per_bin, bin_x, bin_y, track_1, track_2)
 
     # remove duplicate tracks from inside the same bin
     remove_duplicate_tracks(tracks_per_bin)
 
-    # get the indices of the bins with the most hits and split in r/z-coordinates
-    top_indices = largest_indices(accumulator, num_tracks_to_estimate)
-    bin_xs, bin_ys = top_indices
+    # get the indices of the bins that have at least the minimum required hits
+    top_indices = bins_with_least_hits(tracks_per_bin, selection_hyperparameters['minimum-hits-per-bin'])
 
     # compute the coefficients (hence the tracks) from the location of the bin and book-keep which hits it contains
     est_tracks_to_hits = {}
-    for bin_x, bin_y in zip(bin_xs, bin_ys):
-        key_m = left_m_limit + bin_x * bin_size[0]
-        key_b = left_b_limit + bin_y * bin_size[1]
+    for bin_x, bin_y in top_indices:
+        key_m = m_limits[0] + bin_x * bin_size[0]
+        key_b = b_limits[0] + bin_y * bin_size[1]
         est_tracks_to_hits[(key_m, key_b)] = tracks_per_bin[(bin_x, bin_y)]
 
-    return est_tracks_to_hits, hit_to_truth_df_row
+    return est_tracks_to_hits
