@@ -2,13 +2,16 @@ import numpy as np
 import pandas as pd
 
 
+def get_track_to_truth_row_mapping(truth_df):
+    """ Returns a dictionary that maps a track to its row index in the dataframe. """
+    return {series['track']: row for row, series in truth_df.iterrows()}
 
-def leading_particle(hits, hit_to_truth_df_row, truth_df):
+
+def leading_particle(hits, track_to_truth_df_row, truth_df):
     """ Returns the particle ID of the particle with the highest sum of weights of individual hits. """
-    
     sum_of_weights_per_particle = {}
     for hit in hits:
-        row = hit_to_truth_df_row[hit]
+        row = track_to_truth_df_row[hit]
         df_hit_row = truth_df.iloc[row, :]
         pid, weight = df_hit_row['particle_id'], df_hit_row['weight']
         sum_of_weights_per_particle[pid] = sum_of_weights_per_particle.get(pid, 0.0) + weight
@@ -16,50 +19,47 @@ def leading_particle(hits, hit_to_truth_df_row, truth_df):
     return max(sum_of_weights_per_particle, key=sum_of_weights_per_particle.get)
 
 
-def matching_probability(hits, hit_to_truth_df_row, truth_df):
+def matching_probability(hits, track_to_truth_df_row, truth_df):
     """
     :param list[tuple[float, float]] hits:
         A list with all the hits that correspond (i.e. belong) to a specific estimated track.
-        
-    :param dict[tuple[float, float], int] hit_to_truth_df_row:
-        A dictionary that maps a hit to the row of the truth dataframe that contains that hit.
+
+    :param dict[tuple[float, float], int] track_to_truth_df_row:
+        A dictionary that maps a track to the tuth_dataframe row that corresponds to it.
         
     :param pd.DataFrame truth_df:
         A pandas dataframe that contains the truth values for every hit and every particle.
 
 
     :returns:
-        \sum{weights_of_hits_found_for_leading_particle} / \sum{weights_of_all_hits_of_leading_particle}
+        leading-particle, \sum{weights-of-hits-found-for-leading-particle} / \sum{weights-of-all-hits-of-leading-particle}
     :rtype:
-        double
+        tuple[str, double]
     """
 
     # get the leading particle
-    leading_particle_id = leading_particle(hits, hit_to_truth_df_row, truth_df)
+    leading_particle_id = leading_particle(hits, track_to_truth_df_row, truth_df)
     leading_particle_df = truth_df[truth_df['particle_id'] == leading_particle_id]
     
     # compute the sum of weights for the hits of the leading particle found, and the total sum of weights
     hits_found_weight = 0.0
     total_weight = 0.0
     for _, series in leading_particle_df.iterrows():
-        hit = -series['r'], series['tz']
+        track = series['track']
         weight = series['weight']
-        if hit in hits:
+        if track in hits:
             hits_found_weight += weight
         total_weight += weight
         
     # return the percentage
-    return hits_found_weight / total_weight
+    return leading_particle_id, hits_found_weight / total_weight
 
 
-def efficiency_rate(hits_per_estimated_track, hit_to_truth_df_row, truth_df, threshold=0.5):
+def efficiency_rate(hits_per_estimated_track, truth_df, threshold=0.5):
     """
     :param list[list[tuple[float, float]]] hits_per_estimated_track:
         A list that contains lists with all the hits that correspond (i.e. belong) to a specific estimated track.
 
-    :param dict[tuple[float, float], int] hit_to_truth_df_row:
-        A dictionary that maps a hit to the row of the truth dataframe that contains that hit.
-        
     :param pd.DataFrame truth_df:
         A pandas dataframe that contains the truth values for every hit and every particle.
 
@@ -69,26 +69,25 @@ def efficiency_rate(hits_per_estimated_track, hit_to_truth_df_row, truth_df, thr
 
     
     :returns:
-        # {successfully reconstructed tracks} / # {estimated tracks}
+        # {successfully reconstructed tracks} / # {total number of existing tracks}
     :rtype:
         float
     """
-    count_above_threshold = 0
+    track_to_truth_df_row = get_track_to_truth_row_mapping(truth_df)
+    found_particles = set()
     for hits in hits_per_estimated_track:
-        if matching_probability(hits, hit_to_truth_df_row, truth_df) >= threshold:
-            count_above_threshold += 1
+        pid, prob = matching_probability(hits, track_to_truth_df_row, truth_df)
+        if prob >= threshold and pid not in found_particles:
+            found_particles.add(pid)
     
-    return count_above_threshold / len(hits_per_estimated_track)
+    return len(found_particles) / len(set(truth_df['particle_id']))
 
 
 # ToDo: Cross check to see if this is ok
-def fake_rate(hits_per_estimated_track, hit_to_truth_df_row, truth_df, threshold=0.25):
+def fake_rate(hits_per_estimated_track, truth_df, threshold=0.25):
     """
     :param list[list[tuple[float, float]]] hits_per_estimated_track:
         A list that contains lists with all the hits that correspond (i.e. belong) to a specific estimated track.
-
-    :param dict[tuple[float, float], int] hit_to_truth_df_row:
-        A dictionary that maps a hit to the row of the truth dataframe that contains that hit.
 
     :param pd.DataFrame truth_df:
         A pandas dataframe that contains the truth values for every hit and every particle.
@@ -103,21 +102,20 @@ def fake_rate(hits_per_estimated_track, hit_to_truth_df_row, truth_df, threshold
     :rtype:
         double
     """
+    track_to_truth_df_row = get_track_to_truth_row_mapping(truth_df)
     count_below_threshold = 0
     for hits in hits_per_estimated_track:
-        if matching_probability(hits, hit_to_truth_df_row, truth_df) < threshold:
+        _, prob = matching_probability(hits, track_to_truth_df_row, truth_df)
+        if prob < threshold:
             count_below_threshold += 1
 
     return count_below_threshold / len(hits_per_estimated_track)
 
 
-def duplicate_rate(hits_per_estimated_track, hit_to_truth_df_row, truth_df):
+def duplicate_rate(hits_per_estimated_track, truth_df):
     """
     :param list[list[tuple[float, float]]] hits_per_estimated_track:
         A list that contains lists with all the hits that correspond (i.e. belong) to a specific estimated track.
-
-    :param dict[tuple[float, float], int] hit_to_truth_df_row:
-        A dictionary that maps a hit to the row of the truth dataframe that contains that hit.
 
     :param pd.DataFrame truth_df:
         A pandas dataframe that contains the truth values for every hit and every particle.
@@ -128,7 +126,8 @@ def duplicate_rate(hits_per_estimated_track, hit_to_truth_df_row, truth_df):
     :rtype:
         double
     """
-    particles_found = [leading_particle(hits, hit_to_truth_df_row, truth_df) for hits in hits_per_estimated_track]
+    track_to_truth_df_row = get_track_to_truth_row_mapping(truth_df)
+    particles_found = [leading_particle(hits, track_to_truth_df_row, truth_df) for hits in hits_per_estimated_track]
     return 1.0 - len(set(particles_found)) / len(hits_per_estimated_track)
 
 
