@@ -77,8 +77,10 @@ def efficiency_rate(hits_per_estimated_track, truth_df, threshold=0.5):
     found_particles = set()
     for hits in hits_per_estimated_track:
         pid, prob = matching_probability(hits, track_to_truth_df_row, truth_df)
-        if prob >= threshold and pid not in found_particles:
+        if prob >= threshold:
             found_particles.add(pid)
+        if len(found_particles) == len(set(truth_df['particle_id'])):
+            break
     
     return len(found_particles) / len(set(truth_df['particle_id']))
 
