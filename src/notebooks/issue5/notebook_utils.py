@@ -1,36 +1,19 @@
 import numpy as np
 import pandas as pd
-
-from operator import itemgetter
-
+import math
 
 
-def find_intersections(track_1, track_2):
-    """ Finds the intersection point of the two given tracks. """
-    m1, b1 = track_1
-    m2, b2 = track_2
-    intersection_x = - (b2 - b1) / (m2 - m1)
-    intersection_y = m1 * intersection_x + b1
-    return intersection_x, intersection_y
+def get_str(x, n=2):
+    """ returns a float as a string and cuts at the n-th decimal digit """
+    x = truncate(x, n)
+    x = 0.0 if x == 0.0 else x
+    before, after = str(x).split('.', 1)
+    return '.'.join([before, after[:n]])
 
 
-def compute_all_intersections(tracks):
-    """ Returns a dictionary that maps a tuple of tracks IDs (their indices in the `tracks` list) to their intersection point """
-    tracks_to_intersections = {}
-    for idx_1, track_1 in enumerate(tracks):
-        for idx_2, track_2 in enumerate(tracks[idx_1 + 1:]):
-            intersection_x, intersection_y = find_intersections(track_1, track_2)
-            tracks_to_intersections[(idx_1, idx_1 + 1 + idx_2)] = (intersection_x, intersection_y)
-    return tracks_to_intersections
-
-
-def get_limits(tracks):
-    """ Returns the minimum and maximum values for each component (i.e. min/max(x-coordinates), min/max(y-coordinates)) """
-    min_x = min(tracks, key=itemgetter(0))[0]
-    max_x = max(tracks, key=itemgetter(0))[0]
-    min_y = min(tracks, key=itemgetter(1))[1]
-    max_y = max(tracks, key=itemgetter(1))[1]
-    return (min_x, max_x), (min_y, max_y)
+def truncate(f, n):
+    """ Truncates the digits of a floating point number. e.g.: f(0.8756343, 3) = 0.875 """
+    return math.floor(f * 10 ** n) / 10 ** n
 
 
 def find_bin(x, y, left_limit, lower_limit, width_bin_size, height_bin_size):
