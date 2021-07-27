@@ -73,13 +73,14 @@ def efficiency_rate(hits_per_estimated_track, truth_df, threshold=0.5):
     :rtype:
         float
     """
+    num_true_particles = len(set(truth_df['particle_id']))
     track_to_truth_df_row = get_track_to_truth_row_mapping(truth_df)
     found_particles = set()
     for hits in hits_per_estimated_track:
         pid, prob = matching_probability(hits, track_to_truth_df_row, truth_df)
         if prob >= threshold:
             found_particles.add(pid)
-        if len(found_particles) == len(set(truth_df['particle_id'])):
+        if len(found_particles) == num_true_particles:
             break
     
     return len(found_particles) / len(set(truth_df['particle_id']))
