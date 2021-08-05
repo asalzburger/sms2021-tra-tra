@@ -86,7 +86,6 @@ def efficiency_rate(hits_per_estimated_track, truth_df, threshold=0.5):
     return len(found_particles) / len(set(truth_df['particle_id']))
 
 
-# ToDo: Cross check to see if this is ok
 def fake_rate(hits_per_estimated_track, truth_df, threshold=0.25):
     """
     :param list[list[tuple[float, float]]] hits_per_estimated_track:
