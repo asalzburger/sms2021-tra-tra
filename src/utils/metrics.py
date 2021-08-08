@@ -111,7 +111,7 @@ def fake_rate(hits_per_estimated_track, truth_df, threshold=0.25):
         if prob < threshold:
             count_below_threshold += 1
 
-    return count_below_threshold / len(hits_per_estimated_track)
+    return count_below_threshold / len(hits_per_estimated_track) if len(hits_per_estimated_track) > 0 else 0.0
 
 
 def duplicate_rate(hits_per_estimated_track, truth_df):
@@ -130,7 +130,7 @@ def duplicate_rate(hits_per_estimated_track, truth_df):
     """
     track_to_truth_df_row = get_track_to_truth_row_mapping(truth_df)
     particles_found = [leading_particle(hits, track_to_truth_df_row, truth_df) for hits in hits_per_estimated_track]
-    return 1.0 - len(set(particles_found)) / len(hits_per_estimated_track)
+    return (1.0 - len(set(particles_found)) / len(hits_per_estimated_track)) if len(hits_per_estimated_track) > 0 else 0.0
 
 
 
