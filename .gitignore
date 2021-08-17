@@ -3,3 +3,9 @@
 
 # ignore python generated directories
 __pycache__
+
+# vs code files
+.vscode
+
+# custom files
+token.txt

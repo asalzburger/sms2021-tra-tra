@@ -1,0 +1,10 @@
+identifier	time_total_s	time_perevent_s
+Reader:CsvParticleReader	0.02424	0.0002424
+Algorithm:ParticleSelector	0.0004564	4.564e-06
+Algorithm:FatrasAlgorithm	0.2057	0.002057
+Writer:CsvParticleWriter	0.01744	0.0001744
+Writer:CsvParticleWriter	0.02453	0.0002453
+Writer:CsvSimHitWriter	0.2971	0.002971
+Writer:CsvParticleWriter:endRun	7e-08	7e-10
+Writer:CsvParticleWriter:endRun	2.6e-08	2.6e-10
+Writer:CsvSimHitWriter:endRun	5.8e-08	5.8e-10
