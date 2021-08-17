@@ -181,8 +181,6 @@ def plot_heatmaps(accumulators, precise_rois, approx_rois):
     precise_roi_phis, precise_roi_qpts = precise_rois
     approx_roi_phis, approx_roi_qpts = approx_rois
 
-    # roi_phis, roi_qpts = rois
-    
     # define the figure and the axes
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 10))
 
