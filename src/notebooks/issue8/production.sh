@@ -95,7 +95,7 @@ run_fatras_dd4hep_simulation()
     $FATRAS_SIMULATION_BIN            \
         --dd4hep-input=$DD4HEP_INPUT  \
         --output-csv                  \
-        $ADDITIONAL_ARGS              \
+        "$ADDITIONAL_ARGS"            \
         --input-dir=./
 }
 
