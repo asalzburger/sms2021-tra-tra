@@ -1,10 +1,6 @@
 import pandas as pd
-
-
-def get_track_to_truth_row_mapping(truth_df):
-    """ Returns a dictionary that maps a track to its
-        row index in the dataframe. """
-    return {series['track']: row for row, series in truth_df.iterrows()}
+from tqdm.notebook import tqdm
+from src.utils.preprocessing import get_track_to_truth_row_mapping
 
 
 def compute_sum_of_weights(hits, track_to_truth_df_row, truth_df):
@@ -119,7 +115,7 @@ def efficiency_rate(hits_per_estimated_track, truth_df, threshold=0.5):
     num_true_particles = len(set(truth_df['particle_id']))
     track_to_truth_df_row = get_track_to_truth_row_mapping(truth_df)
     found_particles = set()
-    for hits in hits_per_estimated_track:
+    for hits in tqdm(hits_per_estimated_track, desc='Efficiency Rate'):
         pid, prob = matching_probability(hits, track_to_truth_df_row, truth_df)
         if prob >= threshold:
             found_particles.add(pid)
@@ -151,7 +147,7 @@ def fake_rate(hits_per_estimated_track, truth_df, threshold=0.25):
     """
     track_to_truth_df_row = get_track_to_truth_row_mapping(truth_df)
     count_below_threshold = 0
-    for hits in hits_per_estimated_track:
+    for hits in tqdm(hits_per_estimated_track, desc='Fake Rate'):
         _, prob = matching_probability(hits, track_to_truth_df_row, truth_df)
         if prob < threshold:
             count_below_threshold += 1
@@ -179,7 +175,8 @@ def duplicate_rate(hits_per_estimated_track, truth_df):
     """
     track_to_truth_df_row = get_track_to_truth_row_mapping(truth_df)
     particles_found = [leading_particle(hits, track_to_truth_df_row, truth_df)
-                       for hits in hits_per_estimated_track]
+                       for hits in tqdm(hits_per_estimated_track,
+                                        desc='Duplicate Rate')]
     return (1.0 - len(set(particles_found)) / len(hits_per_estimated_track)) \
         if len(hits_per_estimated_track) > 0 \
         else 0.0

@@ -1,4 +1,5 @@
 import numpy as np
+from tqdm.notebook import tqdm
 
 from src.utils.selection import bins_with_least_hits
 
@@ -39,10 +40,10 @@ def update_tracks_per_bin(tracks_per_bin, track, bin_xs, bin_ys):
             tracks_per_bin[(bin_x, bin_y)].append(track)
 
 
-def compute_track_to_hits_mapping(tracks_per_bin, top_indices,
-                                  lower_phi, lower_qpt, bin_size):
+def compute_track_to_hits_index_mapping(tracks_per_bin, top_indices,
+                                        lower_phi, lower_qpt, bin_size):
     """ Creates a dictionary that maps:
-        (est_phi, est_qpt) -> [hits they "cover"] """
+        (est_phi, est_qpt) -> [indices of hits they "cover"] """
     est_tracks_to_hits = {}
     for bin_x, bin_y in top_indices:
         key_x = lower_phi + bin_x * bin_size[0]
@@ -51,9 +52,31 @@ def compute_track_to_hits_mapping(tracks_per_bin, top_indices,
     return est_tracks_to_hits
 
 
-def hough2d_pipeline(tracks, hyperparams, compute_ys_func):
-    """ Computes the 2D Hough transformation for a given function
-        (compute_ys_func) and the tracks provided. """
+def hough2d_pipeline(tracks, hyperparams, compute_ys_func, use_tqdm=False):
+    """
+    :param list[tuple[float, float]] tracks:
+        A list containing the parameters that define a track in the Hough space.
+
+    :param dict[str, Any] hyperparams:
+        A dictionary that gives the hyperparameters of the algorithm.
+
+    :param function compute_ys_func:
+        The function that computes the y values given a track.
+
+    :param bool use_tqdm:
+        Whether to use the tqdm progress bar.
+
+
+    :returns:
+        The accumulator array that comes from the application of the 2D Hough
+        Transform and the dictionary that maps estimated tracks to the
+        indices of the hits containing it.
+    :rtype:
+        tuple[np.ndarray, dict[tuple[float, float], list[int]]]
+
+    Computes the 2D Hough transformation for a given function (compute_ys_func)
+    and the tracks provided.
+    """
     # unpack hyperparameters
     xrange, yrange = hyperparams['xrange'], hyperparams['yrange']
     bin_size = hyperparams['bin-size']
@@ -75,7 +98,9 @@ def hough2d_pipeline(tracks, hyperparams, compute_ys_func):
     tracks_per_bin = {}
 
     # run through all the tracks
-    for track in tracks:
+    if use_tqdm:
+        tracks = tqdm(tracks, desc='Hough Transform')
+    for hit_index, track in enumerate(tracks):
         # compute the y-values for the according transformation
         ys = compute_ys_func(xs, track[0], track[1])
 
@@ -93,14 +118,14 @@ def hough2d_pipeline(tracks, hyperparams, compute_ys_func):
         flat_accumulator[flat_indices] += 1
 
         # update the book-keeping structures
-        update_tracks_per_bin(tracks_per_bin, track, bin_xs, bin_ys)
+        update_tracks_per_bin(tracks_per_bin, hit_index, bin_xs, bin_ys)
 
     # get the indices of the bins that have at least the minimum required hits
     top_indices = bins_with_least_hits(tracks_per_bin, nhits)
 
     # get the dictionaries that map a hyperparameter pair to
     # the hits it contains (in the corresponding bin)
-    est_tracks_to_hits = compute_track_to_hits_mapping(
+    est_tracks_to_hits = compute_track_to_hits_index_mapping(
         tracks_per_bin, top_indices, xrange[0], yrange[0], bin_size
     )
 
@@ -109,10 +134,12 @@ def hough2d_pipeline(tracks, hyperparams, compute_ys_func):
 
 def remove_found_hits(truth_df, est_tracks_to_hits):
     """ Removes the hits that were identified by the hough
-        transform algorithm """
+        transform algorithm. """
     hits_found = set()
     df_copy = truth_df.copy()
-    for hits in est_tracks_to_hits.values():
+    for hits in tqdm(est_tracks_to_hits.values(),
+                     total=len(est_tracks_to_hits),
+                     desc='Removing Identified Hits'):
         for hit in hits:
             if hit not in hits_found:
                 df_copy = df_copy[df_copy['track'] != hit]
@@ -145,7 +172,8 @@ def hough2d_combined_pipeline(transform1_est_tracks_to_hits, truth_df,
     for track, hits in transform2_est_tracks_to_hits.items():
         transform1_est_tracks_to_hits[track] = []
         for hit in hits:
-            other_transform_track = truth_df[truth_df[transform2_type] == hit][transform1_type].iloc[0]
+            other_transform_track = truth_df[truth_df[transform2_type]
+                                             == hit][transform1_type].iloc[0]
             transform1_est_tracks_to_hits[track].append(other_transform_track)
 
     return transform1_est_tracks_to_hits
